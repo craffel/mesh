@@ -346,96 +346,46 @@ cd mesh/
 DATA_DIR=gs://noam-mtf/data
 MODEL_DIR=gs://noam-mtf/transformer_standalone
 TPU=noam-mtf-donut
+ZONE=europe-west4-a
+PROJECT=my-gcp-project
 
-# MODEL HPARAMS AND DIRECTORY  (uncomment one)
-# base model
-MODEL=./transformer/gin/model_base.gin
-# 5B parameters (too big for this dataset, only trains with model-parallelism)
-# MODEL=./transformer/gin/model_5b.gin
+# Model hyperparameters
+MODEL=./transformer/gin/lm_base.gin
 
-# UNCOMMENT ONE OF THESE
+# Model layout (uncomment one of these)
 # Data-parallelism
-LAYOUT=./transformer/gin/layout_data_parallel.gin
+LAYOUT=./transformer/gin/layouts/2x2_dp.gin
 # Model-parallelism
-# LAYOUT=./transformer/gin/layout_model_parallel.gin
+# LAYOUT=./transformer/gin/layouts/2x2_mp.gin
 # Data-parallelism and Model-Parallelism
-# LAYOUT=./transformer/gin/layout_data_and_model_parallel.gin
+# LAYOUT=./transformer/gin/layouts/2x2_dp_mp.gin
+
+# Dataset information
+PROBLEM=./transformer/gin/problems/lm1b.gin
 
 # TRAIN
-python examples/transformer_standalone.py \
-  --tpu=$TPU --data_dir=$DATA_DIR --model_dir=$MODEL_DIR --gin_file=$MODEL \
-  --gin_file=$LAYOUT --gin_param="run.mode='train'"
+python transformer/main.py \
+  --tpu=$TPU \
+  --gcp_project=$PROJECT \
+  --tpu_zone=$ZONE \
+  --model_dir=$MODEL_DIR \
+  --gin_file=$MODEL \
+  --gin_file=$LAYOUT \
+  --gin_file=$PROBLEM \
+  --gin_param="dataset.pretokenized_tfds_dataset.tfds_data_dir = \"${DATA_DIR}\""
 
 # EVAL
-python examples/transformer_standalone.py \
-  --tpu=$TPU --data_dir=$DATA_DIR --model_dir=$MODEL_DIR --gin_file=$MODEL \
-  --gin_file=$LAYOUT --gin_param="run.mode='evaluate'"
-```
-
-The above code will train on the LM1B language modeling benchmark, as specified
-in `examples/transformer_standalone_defaults.gin`. To train a
-sequence-to-sequence model on WMT14 en-de, change `utils.run.dataset` to
-`wmt_translate_ende/ende_subwords8k_t2t` and set `utils.run.mode` to `True`.
-Note that the `wmt_translate_ende/ende_subwords8k_t2t` dataset was removed from
-TensorFlow Datasets in
-[commit 211cb6f](https://github.com/tensorflow/datasets/commit/211cb6f082c5cc3c482e37d70234142a8fda2db3),
-so in order to train a model using this dataset you need to install a version of
-TFDS before this commit. Then, you can decode the WMT en-de development set
-and evaluate it using [SacreBLEU](https://github.com/mjpost/sacreBLEU) like so:
-
-```
-# INFER
-pip3 install sacrebleu
-mkdir ~/input ~/output
-DECODE_INPUT=/home/$USER/input/ende.dev
-DECODE_OUTPUT=/home/$USER/output/ende.dev.out
-~/.local/bin/sacrebleu -t wmt13 -l en-de --echo src > $DECODE_INPUT
-python examples/transformer_standalone.py \
-  --tpu=$TPU --data_dir=$DATA_DIR --model_dir=$MODEL_DIR --gin_file=$MODEL \
+python transformer/main.py \
+  --tpu=$TPU \
+  --gcp_project=$PROJECT \
+  --tpu_zone=$ZONE \
+  --model_dir=$MODEL_DIR \
+  --gin_file=$MODEL \
   --gin_file=$LAYOUT \
-  --gin_param="decode_from_file.input_filename='$DECODE_INPUT'" \
-  --gin_param="decode_from_file.output_filename='$DECODE_OUTPUT'" \
-  --gin_param="run.mode='infer'"
-
-# Compute BLEU score for dev set
-cat $DECODE_OUTPUT | ~/.local/bin/sacrebleu -t wmt13 -l en-de -tok intl
+  --gin_file=$PROBLEM \
+  --gin_param="dataset.pretokenized_tfds_dataset.tfds_data_dir = \"${DATA_DIR}\"" \
+  --gin_param="run.mode='evaluate'"
 ```
-
-
-## Run the Transfomer model with Tensor2Tensor config
-```sh
-git clone https://github.com/tensorflow/tensor2tensor.git
-cd tensor2tensor/
-pip install --user  .
-```
-
-Before running the model, you need to prepare the training data and bucket for
-storing checkpoints. Refer to the
-[Transformer tutorial](https://cloud.google.com/tpu/docs/tutorials/transformer)
-to learn how to generate the training data and create buckets.
-
-```sh
-CONF=mtf_transformer_paper_tr_0_mesh_8
-NAME=ende_$CONF\_0828
-MODEL=mtf_transformer
-PROBLEM=translate_ende_wmt32k_packed
-
-DATA_DIR=gs://xxxx
-OUT_DIR=gs://xxxx
-TPU_NAME=ylc-mtf-donut
-
-tensor2tensor/bin/t2t-trainer \
-  --model=$MODEL \
-  --hparams_set=$CONF \
-  --problem=$PROBLEM \
-  --train_steps=10000 \
-  --eval_steps=200 \
-  --data_dir=$DATA_DIR \
-  --output_dir=$OUT_DIR \
-  --use_tpu=True \
-  --cloud_tpu_name=$TPU_NAME
-```
-
 
 ## Run the toy model without Tensor2Tensor dependencies
 
