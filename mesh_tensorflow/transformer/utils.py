@@ -1550,7 +1550,14 @@ def decode_from_dataset(estimator,
       # Extract the portion of decodes corresponding to this dataset
       dataset_size = len(examples_for_ds)
       predictions = decodes[:dataset_size]
-
+      
+      # Write the raw outputs to file.
+      predictions_filename = os.path.join(
+          decode_output_dir,
+          "{}_{}_predictions".format(infer_dataset.name, checkpoint_step),
+      )
+      write_lines_to_file(predictions, predictions_filename)
+      
       # Remove the used decodes.
       del decodes[:dataset_size]
 
@@ -2398,17 +2405,23 @@ def eval_model(estimator,
           eval_dataset.postprocess_fn(d, example=ex)
           for d, ex in zip(outputs[:dataset_size], examples)
       ]
-      # Remove the used decodes.
-      del outputs[:dataset_size]
 
       global_step = int(get_step_from_checkpoint_path(checkpoint_path))
 
       if output_eval_examples:
+        outputs_filename = os.path.join(
+            summary_dir,
+            "{}_{}_outputs".format((eval_dataset.name, global_step),
+        )
+        write_lines_to_file(outputs[:dataset_size], outputs_filename)
         predictions_filename = os.path.join(
             eval_summary_dir,
             "{}_{}_predictions".format(eval_dataset.name, global_step),
         )
         write_lines_to_file(predictions, predictions_filename)
+
+      # Remove the used decodes.
+      del outputs[:dataset_size]
 
       for metric_fn in eval_dataset.metric_fns:
         summary = tf.Summary()
