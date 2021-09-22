@@ -2403,7 +2403,7 @@ def eval_model(estimator,
 
       if output_eval_examples:
         outputs_filename = os.path.join(
-            summary_dir,
+            eval_summary_dir,
             "{}_{}_outputs".format(eval_dataset.name, global_step),
         )
         write_lines_to_file(outputs[:dataset_size], outputs_filename)
