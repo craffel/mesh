@@ -1550,6 +1550,7 @@ def decode_from_dataset(estimator,
       # Extract the portion of decodes corresponding to this dataset
       dataset_size = len(examples_for_ds)
       predictions = decodes[:dataset_size]
+
       # Remove the used decodes.
       del decodes[:dataset_size]
 
